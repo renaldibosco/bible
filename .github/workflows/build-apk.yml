@@ -43,7 +43,7 @@ jobs:
           git config user.email "build-bot@users.noreply.github.com"
           git checkout --orphan build-log
           git rm -rf --cached . > /dev/null
-          tail -n 300 build.log > build-result.log
+          { grep -E '^(en|ta|or|note|FAIL)[ :]' build.log; echo '--- errors ---'; grep -E '^e: |error:|FAILED' build.log; echo '--- tail ---'; tail -n 40 build.log; } > build-result.log || true
           git add -f build-result.log
           git commit -m "build log ${{ github.run_number }}"
           git push -f origin build-log
