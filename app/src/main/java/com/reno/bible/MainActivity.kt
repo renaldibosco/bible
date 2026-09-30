@@ -99,7 +99,7 @@ class MainActivity : Activity() {
         return if (hasVoice) "ok" else "missing"
     }
 
-    private fun speakQueue(json: String, rate: Float) {
+    private fun doSpeakQueue(json: String, rate: Float) {
         val t = tts ?: return
         if (!ttsReady) { js("window.ttsEvent('error', null, 'starting')"); return }
         val items = JSONArray(json)
@@ -146,7 +146,7 @@ class MainActivity : Activity() {
         }
 
         @JavascriptInterface
-        fun speakQueue(json: String, rate: Float) = runOnUiThread { speakQueue(json, rate) }
+        fun speakQueue(json: String, rate: Float) = runOnUiThread { doSpeakQueue(json, rate) }
 
         @JavascriptInterface
         fun stopSpeaking() = runOnUiThread { try { tts?.stop() } catch (_: Exception) {} }
