@@ -38,6 +38,7 @@
         <button id="votdImage" class="pill small">Image</button>
         <button id="votdOpen" class="pill small primary">Open</button>
       </span></div>
+    <button id="votdFeel" class="votd-feel">How are you feeling today? ›</button>
   </div>
   <div id="chapter" class="chapter"></div>
   <nav class="chapnav">
@@ -106,6 +107,10 @@
 
 <section id="pickSheet" class="sheet tall" hidden>
   <div class="grab"></div>
+  <button id="pickMic" class="saybar">
+    <svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>
+    Tap and say a verse — “Psalm 23”, “யோவான் 3:16”
+  </button>
   <div class="sheet-head">
     <div class="tabs">
       <button class="tab on" data-testament="ot">Old Testament</button>
@@ -129,6 +134,16 @@
 
 <section id="menuSheet" class="sheet" hidden>
   <div class="grab"></div>
+  <div class="tiles">
+    <button id="openFeel" class="tile">
+      <svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg>
+      <span>How I feel</span>
+    </button>
+    <button id="openAlarm" class="tile">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="7"/><path d="M12 9.5V13l2.5 2M5 4 2.5 6.5M19 4l2.5 2.5"/></svg>
+      <span>Scripture alarm</span><small id="alarmTileSub"></small>
+    </button>
+  </div>
   <h2>Reading</h2>
   <div class="setting">
     <span>Text size</span>
@@ -179,7 +194,8 @@
     <b>English</b> — King James Version (1769), public domain.<br>
     <b>தமிழ்</b> — Indian Revised Version (IRV) Tamil, © 2017, 2019 Bridge Connectivity Solutions, CC BY-SA 4.0.<br>
     <b>ଓଡ଼ିଆ</b> — Indian Revised Version (IRV) Odia, © 2017, 2019, 2021 Bridge Connectivity Solutions, CC BY-SA 4.0.<br>
-    Text from eBible.org. Fonts: Crimson Pro, Noto Serif Tamil, Noto Serif Oriya (SIL Open Font License).
+    <b>עברית</b> — The Holy Bible in Modern Hebrew, public domain.<br>
+    Text from eBible.org. Fonts: Crimson Pro, Noto Serif Tamil, Noto Serif Oriya, Noto Serif Hebrew (SIL Open Font License).
   </p>
 </section>
 
@@ -226,13 +242,47 @@
   <div id="sleepList" class="choices row"></div>
 </section>
 
+<section id="feelSheet" class="sheet tall" hidden>
+  <div class="grab"></div>
+  <div id="feelGrid" class="feelgrid"></div>
+  <div id="feelDetail" class="feeldetail" hidden>
+    <div class="feelhead">
+      <button id="feelBack" class="back">‹ <span id="feelName"></span></button>
+      <button id="feelListen" class="pill primary">
+        <svg viewBox="0 0 24 24"><path d="M5 9v6h4l5 4V5L9 9H5z"/><path d="M17 8.5a5 5 0 0 1 0 7"/></svg> Listen to all
+      </button>
+    </div>
+    <div id="feelList" class="results"></div>
+  </div>
+</section>
+
+<section id="alarmSheet" class="sheet" hidden>
+  <div class="grab"></div>
+  <h2>Scripture alarm</h2>
+  <p class="about">Wake up to the verse of the day. At the alarm time a soft chime plays, then the verse is read aloud — again every minute until you tap <b>I'm awake</b>.</p>
+  <label class="setting toggle big">
+    <span>Alarm on</span>
+    <input id="alarmOn" type="checkbox">
+  </label>
+  <div class="alarm-time"><input id="alarmTime" type="time" value="06:00"></div>
+  <h3>Repeat on</h3>
+  <div id="alarmDays" class="days"></div>
+  <h3>Read the verse in</h3>
+  <div id="alarmLang" class="choices row"></div>
+  <div id="alarmWarn" class="warn" hidden></div>
+  <button id="alarmTest" class="pill wide">Try it now</button>
+</section>
+
 <section id="searchSheet" class="sheet tall" hidden>
   <div class="grab"></div>
   <form id="searchForm" class="searchrow">
     <input id="searchInput" type="search" placeholder="Search the Bible" autocomplete="off">
+    <button id="micBtn" class="round mic" type="button" aria-label="Say a verse">
+      <svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>
+    </button>
     <button class="pill primary" type="submit">Search</button>
   </form>
-  <div id="searchStatus" class="searchstatus"></div>
+  <div id="searchStatus" class="searchstatus">Tip: tap the mic and say a verse, like “John 3:16” or “யோவான் 3:16”.</div>
   <div id="searchResults" class="results"></div>
 </section>
 

@@ -20,14 +20,16 @@ jobs:
           distribution: temurin
           java-version: 17
       - uses: gradle/actions/setup-gradle@v4
-      - name: Download Tamil and Odia Bible text (eBible.org, CC BY-SA 4.0)
+      - name: Download Tamil, Odia (CC BY-SA 4.0) and Hebrew (public domain) text from eBible.org
         run: |
           set -o pipefail
           mkdir -p src
           curl -fsSL --retry 3 -o src/tam2017_usfm.zip https://ebible.org/Scriptures/tam2017_usfm.zip 2>&1 | tee -a build.log
           curl -fsSL --retry 3 -o src/ory_usfm.zip https://ebible.org/Scriptures/ory_usfm.zip 2>&1 | tee -a build.log
+          curl -fsSL --retry 3 -o src/heb_usfm.zip https://ebible.org/Scriptures/heb_usfm.zip 2>&1 | tee -a build.log
           python3 tools/build_data.py usfm ta src/tam2017_usfm.zip 2>&1 | tee -a build.log
           python3 tools/build_data.py usfm or src/ory_usfm.zip 2>&1 | tee -a build.log
+          python3 tools/build_data.py usfm he src/heb_usfm.zip 2>&1 | tee -a build.log
           python3 tools/build_data.py check 2>&1 | tee -a build.log
       - name: Build APK
         run: |

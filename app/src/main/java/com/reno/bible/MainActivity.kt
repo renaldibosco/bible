@@ -102,11 +102,48 @@ class MainActivity : Activity() {
         handler.postDelayed({ js("window.openRef && window.openRef(${r[0]}, ${r[1]}, ${r[2]})") }, 400)
     }
 
+    // ---------------------------------------------------------------- voice ("John 3:16")
+    private fun startListening(tag: String) {
+        val i = Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, tag)
+            putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, tag)
+            putExtra(android.speech.RecognizerIntent.EXTRA_MAX_RESULTS, 5)
+            putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, when (tag) {
+                "ta-IN" -> "வசனத்தைச் சொல்லுங்கள் — யோவான் 3:16"
+                "or-IN" -> "ପଦଟି କୁହନ୍ତୁ — ଯୋହନ 3:16"
+                "he-IL" -> "אמור פסוק — יוחנן 3:16"
+                else -> "Say a verse — John 3:16"
+            })
+        }
+        try {
+            startActivityForResult(i, REQ_VOICE)
+        } catch (_: Exception) {
+            js("window.voiceResult('[]'); window.toastMsg && window.toastMsg('Voice input needs the Google app')")
+        }
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        @Suppress("DEPRECATION")
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != REQ_VOICE) return
+        if (resultCode != RESULT_OK) return
+        val list = data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS) ?: arrayListOf()
+        js("window.voiceResult(${q(JSONArray(list).toString())})")
+    }
+
+    override fun onResume() {
+        super.onResume()
+        js("window.alarmPermsChanged && window.alarmPermsChanged()")
+    }
+
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == REQ_NOTIFY) {
             val ok = grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED
             js("window.notifyPermission && window.notifyPermission($ok)")
+            js("window.alarmPermsChanged && window.alarmPermsChanged()")
         }
     }
 
@@ -244,6 +281,37 @@ class MainActivity : Activity() {
             DailyVerse.save(this@MainActivity, on, hour, minute, lang, names)
 
         @JavascriptInterface
+        fun setAlarm(json: String) = ScriptureAlarm.save(this@MainActivity, json)
+
+        @JavascriptInterface
+        fun testAlarm() = runOnUiThread { ScriptureAlarm.start(this@MainActivity, true) }
+
+        @JavascriptInterface
+        fun alarmStatus(): String {
+            val notify = Build.VERSION.SDK_INT < 33 ||
+                checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+            val full = Build.VERSION.SDK_INT < 34 || nm.canUseFullScreenIntent()
+            return JSONObject().put("notify", notify).put("fullScreen", full).put("exact", ScriptureAlarm.canExact(this@MainActivity)).toString()
+        }
+
+        @JavascriptInterface
+        fun openAlarmSettings(which: String) = runOnUiThread {
+            val uri = android.net.Uri.parse("package:$packageName")
+            val i = when {
+                which == "fullscreen" && Build.VERSION.SDK_INT >= 34 -> Intent(android.provider.Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, uri)
+                which == "exact" && Build.VERSION.SDK_INT >= 31 -> Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, uri)
+                else -> Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, uri)
+            }
+            try { startActivity(i) } catch (_: Exception) {
+                try { startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, uri)) } catch (_: Exception) {}
+            }
+        }
+
+        @JavascriptInterface
+        fun listen(tag: String) = runOnUiThread { startListening(tag) }
+
+        @JavascriptInterface
         fun askNotifications() = runOnUiThread {
             if (Build.VERSION.SDK_INT >= 33 &&
                 checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
@@ -332,7 +400,10 @@ class MainActivity : Activity() {
 
     private fun q(s: String?): String = if (s == null) "null" else JSONObject.quote(s)
 
-    companion object { private const val REQ_NOTIFY = 41 }
+    companion object {
+        private const val REQ_NOTIFY = 41
+        private const val REQ_VOICE = 42
+    }
 }
 
 /** WebView that adds "Read aloud" to the long-press text selection menu. */

@@ -124,7 +124,10 @@ object DailyVerse {
 class DailyVerseReceiver : BroadcastReceiver() {
     override fun onReceive(ctx: Context, intent: Intent) {
         when (intent.action) {
-            Intent.ACTION_BOOT_COMPLETED, Intent.ACTION_MY_PACKAGE_REPLACED -> DailyVerse.reschedule(ctx)
+            Intent.ACTION_BOOT_COMPLETED, Intent.ACTION_MY_PACKAGE_REPLACED -> {
+                DailyVerse.reschedule(ctx)
+                ScriptureAlarm.schedule(ctx)
+            }
             else -> {
                 try { DailyVerse.show(ctx) } catch (_: Exception) {}
                 DailyVerse.reschedule(ctx, fromTomorrow = true)

@@ -9,3 +9,4 @@ local.properties
 # Tamil and Odia text is downloaded and built on GitHub (see .github/workflows)
 app/src/main/assets/data/ta/
 app/src/main/assets/data/or/
+app/src/main/assets/data/he/

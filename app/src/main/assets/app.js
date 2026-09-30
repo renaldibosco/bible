@@ -75,7 +75,7 @@
       let par = "";
       if (parMap) {
         const bits = [...new Set(expand(label).map((n) => parMap.get(n)).filter(Boolean))];
-        if (bits.length) par = `<span class="par" lang="${state.par}">${esc(bits.join(" "))}</span>`;
+        if (bits.length) par = `<span class="par" lang="${state.par}" dir="${LANGS[state.par].rtl ? "rtl" : "ltr"}">${esc(bits.join(" "))}</span>`;
       }
       const m = marks[mkey(state.book, state.chap, label)];
       const cls = m && m.color ? ` hl-${m.color}` : "";
@@ -85,6 +85,7 @@
     const el = $("chapter");
     el.dataset.lang = state.lang;
     el.lang = state.lang;
+    el.dir = L.rtl ? "rtl" : "ltr";
     el.innerHTML = html;
     $("refBook").textContent = bookName(state.book);
     $("refBtn").lang = state.lang;
@@ -216,6 +217,7 @@
     const c = ch.codePointAt(0);
     if (c >= 0x0B80 && c <= 0x0BFF) return "ta";
     if (c >= 0x0B00 && c <= 0x0B7F) return "or";
+    if (c >= 0x0590 && c <= 0x05FF) return "he";
     if ((c >= 0x41 && c <= 0x5A) || (c >= 0x61 && c <= 0x7A)) return "en";
     return "";
   }
@@ -569,7 +571,7 @@
     const re = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
     $("searchResults").innerHTML = results.map((r, k) =>
       `<button class="result" data-k="${k}"><div class="rr">${esc(bookName(r.b, lang))} ${r.c}:${esc(r.label)}</div>` +
-      `<div class="rt">${esc(r.text).replace(re, (m) => `<mark>${m}</mark>`)}</div></button>`).join("");
+      `<div class="rt" dir="auto">${esc(r.text).replace(re, (m) => `<mark>${m}</mark>`)}</div></button>`).join("");
     $("searchResults").onclick = async (ev) => {
       const btn = ev.target.closest(".result");
       if (!btn) return;
@@ -611,6 +613,7 @@
     $("noteRef").textContent = refText(idx);
     $("noteVerse").textContent = idx.map((i) => state.verses[i][1]).join(" ");
     $("noteVerse").lang = state.lang;
+    $("noteVerse").dir = LANGS[state.lang].rtl ? "rtl" : "ltr";
     $("noteText").value = (marks[k] && marks[k].note) || "";
     $("noteDelete").hidden = !(marks[k] && marks[k].note);
     show("noteSheet");
@@ -675,7 +678,7 @@
     let html = "";
     const v = await todayVerse();
     if (v && libFilter === "all") {
-      html += `<button class="result today" data-today="1"><div class="rr">Verse of the day · ${esc(v.ref)}</div><div class="rt">${esc(v.text)}</div></button>`;
+      html += `<button class="result today" data-today="1"><div class="rr">Verse of the day · ${esc(v.ref)}</div><div class="rt" dir="auto">${esc(v.text)}</div></button>`;
     }
     if (!items.length) {
       html += `<div class="empty-note">${libFilter === "note" ? "No notes yet. Tap a verse, then “Note”." : "Tap any verse and pick a colour to highlight it. Your highlights and notes appear here."}</div>`;
@@ -684,7 +687,7 @@
       const book = await getBook(state.lang, m.b);
       const verse = (book[m.c - 1] || []).find((x) => x[0] === m.label);
       html += `<button class="result mark" data-k="${k}"><div class="rr">${m.color ? `<span class="mdot ${m.color}"></span>` : ""}${esc(bookName(m.b))} ${m.c}:${esc(m.label)}</div>` +
-        `<div class="rt">${esc(verse ? verse[1] : "")}</div>` + (m.note ? `<div class="rnote">✎ ${esc(m.note)}</div>` : "") + `</button>`;
+        `<div class="rt" dir="auto">${esc(verse ? verse[1] : "")}</div>` + (m.note ? `<div class="rnote">✎ ${esc(m.note)}</div>` : "") + `</button>`;
     }
     list.innerHTML = html;
     list.onclick = async (e) => {
@@ -734,6 +737,7 @@
     if (!v || !store.get("votdShow", true) || store.get("votdSeen", -1) === dayIndex()) { $("votd").hidden = true; return; }
     $("votdText").textContent = v.text;
     $("votd").lang = state.lang;
+    $("votdText").dir = LANGS[state.lang].rtl ? "rtl" : "ltr";
     $("votdRef").textContent = v.ref;
     $("votd").hidden = false;
     $("votdClose").onclick = () => { store.set("votdSeen", dayIndex()); $("votd").hidden = true; };
@@ -780,7 +784,7 @@
     { id: "paper", name: "Paper", bg: ["#FBF8F2", "#EFE6D6"], ink: "#221C17", accent: "#7A1F2B" },
     { id: "olive", name: "Olive", bg: ["#4A5836", "#1F2718"], ink: "#F4F0E0", accent: "#D9C27A" }
   ];
-  const FAMILY = { en: "Crimson Pro", ta: "Noto Serif Tamil", or: "Noto Serif Oriya" };
+  const FAMILY = { en: "Crimson Pro", ta: "Noto Serif Tamil", or: "Noto Serif Oriya", he: "Noto Serif Hebrew" };
   let imgData = null;
   function openImage(text, ref, lang) {
     imgData = { text, ref, lang, style: store.get("imgStyle", "wine") };
@@ -833,12 +837,14 @@
     const blockH = lines.length * lh + refBlock;
     const top = areaTop + (areaBottom - areaTop - blockH) / 2 + lh / 2;
     ctx.fillStyle = st.ink; ctx.textBaseline = "middle";
+    ctx.direction = LANGS[imgData.lang].rtl ? "rtl" : "ltr";
     lines.forEach((l, k) => ctx.fillText(l, W / 2, top + k * lh));
     // reference
     const refY = top + (lines.length - 0.5) * lh + 36;
     ctx.fillStyle = st.accent; ctx.fillRect(W / 2 - 40, refY, 80, 3);
     ctx.font = `600 40px "${imgData.lang === "en" ? "Crimson Pro" : fam}", serif`;
     ctx.fillText(imgData.ref, W / 2, refY + 50);
+    ctx.direction = "ltr";
     ctx.globalAlpha = 0.6; ctx.fillStyle = st.ink;
     ctx.font = `500 26px system-ui, sans-serif`;
     ctx.fillText(`Holy Bible · ${LANGS[imgData.lang].short}`, W / 2, H - 92);
@@ -895,6 +901,285 @@
     if (state.player) { stopPlayer(); toast("Sleep timer: reading stopped. Good night 🌙", 3500); }
   };
 
+
+  // ------------------------------------------------------------ how I feel
+  let FEEL = null, feelCur = null;
+  async function feelings() {
+    if (FEEL) return FEEL;
+    try { FEEL = native ? JSON.parse(window.Bible.loadText("feelings.json")) : await (await fetch("feelings.json")).json(); }
+    catch (_) { FEEL = []; }
+    return FEEL;
+  }
+  const FEEL_ICON = { worried: "😟", afraid: "😨", sad: "😢", lonely: "🥺", angry: "😠", tired: "😩", strength: "💪",
+    guidance: "🧭", guilty: "😔", sick: "🤒", tempted: "⚠️", thankful: "🙏", joyful: "😊" };
+  const FEEL_TITLE = { en: "How are you feeling?", ta: "நீங்கள் எப்படி உணருகிறீர்கள்?", or: "ଆପଣ କିପରି ଅନୁଭବ କରୁଛନ୍ତି?", he: "?איך אתה מרגיש" };
+  async function openFeelings() {
+    const list = await feelings();
+    const L = state.lang;
+    $("feelGrid").lang = L;
+    $("feelGrid").innerHTML = `<h2 class="feeltitle">${esc(FEEL_TITLE[L] || FEEL_TITLE.en)}</h2>` + list.map((f) =>
+      `<button class="feel" data-id="${f.id}"><span class="fe">${FEEL_ICON[f.id] || "•"}</span>` +
+      `<span class="fn">${esc(f[L] || f.en)}</span>${L !== "en" ? `<span class="fen">${esc(f.en)}</span>` : ""}</button>`).join("");
+    $("feelGrid").hidden = false; $("feelDetail").hidden = true;
+    show("feelSheet");
+  }
+  async function feelVerses(f, lang) {
+    const out = [];
+    for (const [b1, c, a, z] of f.refs) {
+      const b = b1 - 1;
+      const ch = (await getBook(lang, b))[c - 1] || [];
+      const vs = ch.filter((x) => expand(x[0]).some((n) => +n >= a && +n <= z));
+      if (!vs.length) continue;
+      out.push({ b, c, v: a, text: vs.map((x) => x[1]).join(" "),
+        ref: `${bookName(b, lang)} ${c}:${a}${z > a ? "-" + z : ""}` });
+    }
+    return out;
+  }
+  $("feelGrid").onclick = async (e) => {
+    const btn = e.target.closest(".feel"); if (!btn) return;
+    const f = (await feelings()).find((x) => x.id === btn.dataset.id);
+    const vs = await feelVerses(f, state.lang);
+    feelCur = { f, vs };
+    $("feelName").textContent = `${FEEL_ICON[f.id] || ""} ${f[state.lang] || f.en}`;
+    $("feelList").lang = state.lang;
+    $("feelList").innerHTML = vs.map((v, k) =>
+      `<div class="result feelv" data-k="${k}"><div class="rr">${esc(v.ref)}</div><div class="rt" dir="auto">${esc(v.text)}</div>` +
+      `<div class="feelacts"><button class="pill small" data-act="listen">Listen</button><button class="pill small" data-act="image">Image</button>` +
+      `<button class="pill small" data-act="open">Open</button></div></div>`).join("");
+    $("feelGrid").hidden = true; $("feelDetail").hidden = false;
+    $("feelDetail").scrollTop = 0;
+  };
+  $("feelList").onclick = (e) => {
+    const b = e.target.closest("[data-act]"); if (!b) return;
+    const v = feelCur.vs[+b.closest(".feelv").dataset.k];
+    if (b.dataset.act === "listen") play([{ text: v.text, lang: state.lang }], { title: v.ref, chapter: false });
+    else if (b.dataset.act === "image") openImage(v.text, v.ref, state.lang);
+    else { hideSheet(); openVerse(v.b, v.c, v.v); }
+  };
+  $("feelListen").onclick = () => {
+    if (!feelCur) return;
+    const items = [];
+    for (const v of feelCur.vs) { items.push({ text: v.text, lang: state.lang }); }
+    play(items, { title: `${FEEL_ICON[feelCur.f.id] || ""} ${feelCur.f[state.lang] || feelCur.f.en}`, sub: `${feelCur.vs.length} verses`, chapter: false });
+    hideSheet();
+  };
+  $("feelBack").onclick = () => { $("feelGrid").hidden = false; $("feelDetail").hidden = true; };
+  $("openFeel").onclick = openFeelings;
+  $("votdFeel").onclick = openFeelings;
+
+  // ------------------------------------------------------------ talk to open ("John 3:16")
+  const DIGITS = { "௦": 0, "௧": 1, "௨": 2, "௩": 3, "௪": 4, "௫": 5, "௬": 6, "௭": 7, "௮": 8, "௯": 9,
+    "୦": 0, "୧": 1, "୨": 2, "୩": 3, "୪": 4, "୫": 5, "୬": 6, "୭": 7, "୮": 8, "୯": 9 };
+  const ORD = { first: 1, "1st": 1, second: 2, "2nd": 2, third: 3, "3rd": 3,
+    "முதலாம்": 1, "முதல்": 1, "இரண்டாம்": 2, "மூன்றாம்": 3,
+    "ପ୍ରଥମ": 1, "ଦ୍ୱିତୀୟ": 2, "ଦ୍ୱିତୀୟ": 2, "ତୃତୀୟ": 3,
+    "ראשון": 1, "שני": 2, "שלישי": 3, "א": 1, "ב": 2, "ג": 3, "א׳": 1, "ב׳": 2, "ג׳": 3, "א'": 1, "ב'": 2, "ג'": 3 };
+  const SMALL = { zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
+    eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19 };
+  const TENS = { twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90 };
+  const FILLER = new Set(["chapter", "chapters", "verse", "verses", "vs", "and", "to", "the", "book", "of", "open", "go", "show", "me", "read", "please",
+    "அதிகாரம்", "வசனம்", "புத்தகம்", "ଅଧ୍ୟାୟ", "ପଦ", "פרק", "פסוק", "ספר"]);
+  const ALIAS = { psalm: 18, psalms: 18, "song of songs": 21, songs: 21, "song of solomon": 21, canticles: 21, revelations: 65,
+    revelation: 65, "acts of the apostles": 43, apocalypse: 65, "st john": 42, "saint john": 42, "st matthew": 39, "st mark": 40, "st luke": 41 };
+  const normTxt = (t) => t.toLowerCase().normalize("NFC").replace(/[֑-ׇ]/g, "").replace(/[.,;!?"“”()\-–]/g, " ").replace(/\s+/g, " ").trim();
+  function wordsToNumbers(t) {
+    t = t.replace(/[௦-௯୦-୯]/g, (d) => DIGITS[d]).replace(/(\d+)\s*[:.]\s*(\d+)/g, "$1 $2");
+    const out = []; let acc = null;
+    for (const w of t.split(" ")) {
+      if (w in SMALL) { acc = (acc || 0) + SMALL[w]; continue; }
+      if (w in TENS) { acc = (acc || 0) + TENS[w]; continue; }
+      if (w === "hundred") { acc = (acc || 1) * 100; continue; }
+      if (acc !== null && w === "and") continue;
+      if (acc !== null) { out.push(String(acc)); acc = null; }
+      out.push(w);
+    }
+    if (acc !== null) out.push(String(acc));
+    return out.join(" ");
+  }
+  const bigrams = (s) => { s = s.replace(/\s/g, ""); const g = []; for (let i = 0; i < s.length - 1; i++) g.push(s.slice(i, i + 2)); return g; };
+  function dice(a, b) {
+    if (a === b) return 1;
+    const x = bigrams(a), y = bigrams(b);
+    if (!x.length || !y.length) return 0;
+    const m = new Map(); y.forEach((g) => m.set(g, (m.get(g) || 0) + 1));
+    let hit = 0; x.forEach((g) => { if (m.get(g) > 0) { hit++; m.set(g, m.get(g) - 1); } });
+    return (2 * hit) / (x.length + y.length);
+  }
+  let NAMES = null;
+  function nameTable() {
+    if (NAMES) return NAMES;
+    NAMES = [];
+    for (const [lang, list] of Object.entries(BOOKS)) {
+      list.forEach((name, b) => {
+        let n = normTxt(name).replace(/[௦-௯୦-୯]/g, (d) => DIGITS[d]);
+        let num = 0;
+        let m = n.match(/^([123])\s+(.+)$/);
+        if (m) { num = +m[1]; n = m[2]; }
+        m = n.match(/^(.+)\s+([אבג])$/);
+        if (m) { num = { "א": 1, "ב": 2, "ג": 3 }[m[2]]; n = m[1]; }
+        NAMES.push({ base: n, num, b, lang });
+        if (lang === "he" && n.startsWith("אל ")) NAMES.push({ base: n.slice(3), num, b, lang });
+      });
+    }
+    for (const [a, b] of Object.entries(ALIAS)) NAMES.push({ base: a, num: 0, b, lang: "en" });
+    return NAMES;
+  }
+  function parseSpoken(raw) {
+    let t = wordsToNumbers(normTxt(raw));
+    let toks = t.split(" ").filter((w) => w && !FILLER.has(w));
+    // ordinal word or leading number before the name
+    let ord = 0;
+    const kept = [];
+    const nums = [];
+    let seenName = false;
+    for (const w of toks) {
+      if (w in ORD && !seenName) { ord = ORD[w]; continue; }
+      if (/^\d+$/.test(w)) {
+        if (!seenName && !kept.length && +w <= 3) { ord = +w; continue; }
+        nums.push(+w); continue;
+      }
+      if (w in ORD && seenName && !nums.length && /^[אבג]/.test(w)) { ord = ORD[w]; continue; }
+      kept.push(w); seenName = true;
+    }
+    const text = kept.join(" ");
+    if (!text) return null;
+    let best = null;
+    for (const e of nameTable()) {
+      let sc = dice(text, e.base);
+      if (text === e.base) sc = 2;
+      else if (text.includes(e.base) && e.base.length > 3) sc = Math.max(sc, 0.9);
+      if (!best || sc > best.sc) best = { ...e, sc };
+    }
+    if (!best || best.sc < 0.55) return null;
+    // same base shared by 1/2/3 John etc: pick by ordinal
+    const same = nameTable().filter((e) => e.base === best.base && e.lang === best.lang);
+    let pick = same.find((e) => e.num === ord) || same.find((e) => e.num === 0) || same.find((e) => e.num === 1) || best;
+    return { b: pick.b, c: nums[0] || 1, v: nums[1] || 0 };
+  }
+  window.parseSpoken = parseSpoken;
+
+  let listening = false;
+  function startVoice() {
+    if (native && window.Bible.listen) { window.Bible.listen(LANGS[state.lang].tts); listening = true; return; }
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { toast("Voice input isn't available here"); return; }
+    const r = new SR();
+    r.lang = LANGS[state.lang].tts; r.maxAlternatives = 5;
+    r.onresult = (e) => window.voiceResult(JSON.stringify([...e.results[0]].map((a) => a.transcript)));
+    r.onerror = () => toast("Didn't catch that — try again");
+    r.start();
+    toast("Listening…");
+  }
+  window.voiceResult = async (json) => {
+    listening = false;
+    let alts = [];
+    try { alts = JSON.parse(json) || []; } catch (_) {}
+    if (!alts.length) { toast("Didn't catch that — try again"); return; }
+    let hit = null;
+    for (const a of alts) { hit = parseSpoken(a); if (hit) break; }
+    if (!hit) {
+      // not a reference: search for the words instead
+      show("searchSheet");
+      $("searchInput").value = alts[0];
+      $("searchForm").requestSubmit();
+      return;
+    }
+    hideSheet();
+    const count = (await getBook(state.lang, hit.b)).length || CHAPTERS[hit.b];
+    const c = Math.min(Math.max(1, hit.c), count);
+    toast(`${bookName(hit.b)} ${c}${hit.v ? ":" + hit.v : ""}`);
+    if (hit.v) await openVerse(hit.b, c, hit.v); else await go(hit.b, c);
+  };
+  $("micBtn").onclick = startVoice;
+  $("pickMic").onclick = startVoice;
+
+  // ------------------------------------------------------------ scripture alarm
+  const DAYN = { en: ["S", "M", "T", "W", "T", "F", "S"], full: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] };
+  function alarmCfg() { return store.get("alarm", { on: false, time: "06:00", days: [0, 1, 2, 3, 4, 5, 6], lang: state.lang }); }
+  function saveAlarm(cfg, quiet) {
+    store.set("alarm", cfg);
+    const [h, m] = cfg.time.split(":").map(Number);
+    if (native && window.Bible.setAlarm) {
+      window.Bible.setAlarm(JSON.stringify({ on: cfg.on, h, m, days: cfg.days, lang: cfg.lang, names: BOOKS[cfg.lang] }));
+    }
+    renderAlarmTile();
+    if (!quiet && cfg.on) toast(`Alarm set for ${fmtTime(cfg.time)} · ${daysText(cfg.days)}`);
+  }
+  function fmtTime(t) {
+    const [h, m] = t.split(":").map(Number);
+    return `${((h + 11) % 12) + 1}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
+  }
+  function daysText(d) {
+    if (d.length === 7) return "every day";
+    if (d.length === 5 && [1, 2, 3, 4, 5].every((x) => d.includes(x))) return "weekdays";
+    if (d.length === 2 && d.includes(0) && d.includes(6)) return "weekends";
+    return d.slice().sort().map((x) => DAYN.full[x]).join(", ");
+  }
+  function renderAlarmTile() {
+    const c = alarmCfg();
+    $("alarmTileSub").textContent = c.on ? fmtTime(c.time) : "Off";
+  }
+  function renderAlarm() {
+    const c = alarmCfg();
+    $("alarmOn").checked = c.on;
+    $("alarmTime").value = c.time;
+    $("alarmDays").innerHTML = DAYN.full.map((d, i) => `<button class="day${c.days.includes(i) ? " on" : ""}" data-d="${i}">${d}</button>`).join("");
+    $("alarmLang").innerHTML = Object.entries(LANGS).map(([k, L]) => `<button class="chip${k === c.lang ? " on" : ""}" data-l="${k}">${L.native}</button>`).join("");
+    checkAlarmWarn();
+  }
+  function checkAlarmWarn() {
+    const c = alarmCfg();
+    let msg = "";
+    if (native && c.on) {
+      const st = window.Bible.alarmStatus ? JSON.parse(window.Bible.alarmStatus()) : {};
+      if (st.notify === false) msg = `Notifications are off for this app, so the alarm screen can't appear. <button class="linkbtn" data-fix="notify">Allow</button>`;
+      else if (st.fullScreen === false) msg = `Allow the alarm to show on your lock screen. <button class="linkbtn" data-fix="fullscreen">Allow</button>`;
+      else if (st.exact === false) msg = `Allow exact alarms so it rings on time. <button class="linkbtn" data-fix="exact">Allow</button>`;
+    }
+    const st2 = tts.status(LANGS[c.lang].tts);
+    if (!msg && st2 === "missing") msg = `${LANGS[c.lang].name} voice isn't installed — the alarm will read in English. <button class="linkbtn" data-fix="voice">Add voice</button>`;
+    $("alarmWarn").innerHTML = msg;
+    $("alarmWarn").hidden = !msg;
+  }
+  $("alarmWarn").onclick = (e) => {
+    const b = e.target.closest("[data-fix]"); if (!b || !native) return;
+    const f = b.dataset.fix;
+    if (f === "voice") window.Bible.openVoiceSettings();
+    else if (f === "notify") window.Bible.askNotifications();
+    else window.Bible.openAlarmSettings(f);
+  };
+  $("openAlarm").onclick = () => { renderAlarm(); show("alarmSheet"); };
+  $("alarmOn").onchange = (e) => {
+    const c = alarmCfg(); c.on = e.target.checked;
+    if (c.on && !c.days.length) c.days = [0, 1, 2, 3, 4, 5, 6];
+    if (c.on && native && window.Bible.askNotifications) window.Bible.askNotifications();
+    saveAlarm(c); renderAlarm();
+  };
+  $("alarmTime").onchange = (e) => { const c = alarmCfg(); c.time = e.target.value || "06:00"; c.on = true; saveAlarm(c); renderAlarm(); };
+  $("alarmDays").onclick = (e) => {
+    const b = e.target.closest(".day"); if (!b) return;
+    const c = alarmCfg(); const d = +b.dataset.d;
+    c.days = c.days.includes(d) ? c.days.filter((x) => x !== d) : [...c.days, d].sort();
+    if (!c.days.length) c.on = false;
+    saveAlarm(c, true); renderAlarm();
+  };
+  $("alarmLang").onclick = (e) => {
+    const b = e.target.closest(".chip"); if (!b) return;
+    const c = alarmCfg(); c.lang = b.dataset.l; saveAlarm(c, true); renderAlarm();
+  };
+  $("alarmTest").onclick = async () => {
+    const c = alarmCfg();
+    if (native && window.Bible.testAlarm) {
+      window.Bible.setAlarm(JSON.stringify({ on: c.on, h: +c.time.split(":")[0], m: +c.time.split(":")[1], days: c.days, lang: c.lang, names: BOOKS[c.lang] }));
+      window.Bible.testAlarm();
+      toast("Alarm starting…");
+    } else {
+      const v = await todayVerse(c.lang);
+      if (v) play([{ text: v.text, lang: c.lang }], { title: "Scripture alarm (test)", sub: v.ref, chapter: false });
+    }
+  };
+  window.alarmPermsChanged = () => { if (openSheet === $("alarmSheet")) checkAlarmWarn(); };
+
   // ------------------------------------------------------------ navigation
   $("prevBtn").onclick = () => step(-1);
   $("nextBtn").onclick = () => step(1);
@@ -926,6 +1211,7 @@
     return false;
   };
 
+  window.toastMsg = (m) => toast(m, 3500);
   let toastTimer = 0;
   function toast(msg, ms = 2200) {
     const t = $("toast");
@@ -945,4 +1231,6 @@
   applyLook();
   render({ scroll: false }).then(() => { window.scrollTo(0, store.get("scroll", 0)); showVotd(); });
   scheduleDaily();
+  renderAlarmTile();
+  if (alarmCfg().on) saveAlarm(alarmCfg(), true);   // keep the phone's alarm in sync after updates
 })();
