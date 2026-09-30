@@ -1,0 +1,11 @@
+.gradle/
+build/
+/app/build/
+local.properties
+.idea/
+*.iml
+.DS_Store
+
+# Tamil and Odia text is downloaded and built on GitHub (see .github/workflows)
+app/src/main/assets/data/ta/
+app/src/main/assets/data/or/

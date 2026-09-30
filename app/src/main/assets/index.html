@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Holy Bible</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body data-theme="paper">
+
+<header class="bar">
+  <button id="refBtn" class="ref" aria-label="Choose book and chapter">
+    <span id="refBook">Genesis</span> <span id="refChap">1</span>
+    <svg viewBox="0 0 24 24" class="caret"><path d="M7 10l5 5 5-5"/></svg>
+  </button>
+  <div class="bar-actions">
+    <button id="searchBtn" class="icon" aria-label="Search">
+      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>
+    </button>
+    <button id="langBtn" class="lang-pill" aria-label="Change language"><span id="langShort">KJV</span></button>
+    <button id="menuBtn" class="icon" aria-label="Settings">
+      <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+    </button>
+  </div>
+</header>
+
+<main id="reader" class="reader" tabindex="-1">
+  <div id="chapter" class="chapter"></div>
+  <nav class="chapnav">
+    <button id="prevBtn" class="navbtn">‹ <span>Previous</span></button>
+    <button id="nextBtn" class="navbtn"><span>Next</span> ›</button>
+  </nav>
+</main>
+
+<!-- appears when verses are tapped -->
+<div id="selBar" class="selbar" hidden>
+  <span id="selCount" class="selcount">1 verse</span>
+  <button id="selListen" class="pill primary">
+    <svg viewBox="0 0 24 24"><path d="M5 9v6h4l5 4V5L9 9H5z"/><path d="M17 8.5a5 5 0 0 1 0 7"/></svg> Listen
+  </button>
+  <button id="selCopy" class="pill">Copy</button>
+  <button id="selShare" class="pill">Share</button>
+  <button id="selClear" class="icon small" aria-label="Clear selection">
+    <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+  </button>
+</div>
+
+<!-- appears when text is highlighted with a long-press -->
+<button id="readSelection" class="readsel" hidden>
+  <svg viewBox="0 0 24 24"><path d="M5 9v6h4l5 4V5L9 9H5z"/><path d="M17 8.5a5 5 0 0 1 0 7"/></svg> Read aloud
+</button>
+
+<!-- player -->
+<div id="player" class="player" hidden>
+  <div class="player-info">
+    <div id="playerTitle" class="player-title">Reading</div>
+    <div id="playerSub" class="player-sub"></div>
+  </div>
+  <button id="rateBtn" class="pill rate">1.0×</button>
+  <button id="pauseBtn" class="round" aria-label="Pause">
+    <svg id="pauseIcon" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></svg>
+  </button>
+  <button id="stopBtn" class="round ghost" aria-label="Stop">
+    <svg viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="1.5"/></svg>
+  </button>
+</div>
+
+<button id="playFab" class="fab" aria-label="Read this chapter aloud">
+  <svg viewBox="0 0 24 24"><path d="M5 9v6h4l5 4V5L9 9H5z"/><path d="M17 8.5a5 5 0 0 1 0 7"/><path d="M19.5 6a8.5 8.5 0 0 1 0 12"/></svg>
+</button>
+
+<div id="toast" class="toast" hidden></div>
+
+<!-- sheets -->
+<div id="scrim" class="scrim" hidden></div>
+
+<section id="pickSheet" class="sheet tall" hidden>
+  <div class="grab"></div>
+  <div class="sheet-head">
+    <div class="tabs">
+      <button class="tab on" data-testament="ot">Old Testament</button>
+      <button class="tab" data-testament="nt">New Testament</button>
+    </div>
+  </div>
+  <div id="bookList" class="booklist"></div>
+  <div id="chapterPick" class="chapterpick" hidden>
+    <button id="backToBooks" class="back">‹ <span id="pickBookName"></span></button>
+    <div id="chapterGrid" class="grid"></div>
+  </div>
+</section>
+
+<section id="langSheet" class="sheet" hidden>
+  <div class="grab"></div>
+  <h2>Language</h2>
+  <div id="langList" class="choices"></div>
+  <h3>Show a second language under each verse</h3>
+  <div id="parList" class="choices row"></div>
+</section>
+
+<section id="menuSheet" class="sheet" hidden>
+  <div class="grab"></div>
+  <h2>Reading</h2>
+  <div class="setting">
+    <span>Text size</span>
+    <div class="stepper">
+      <button id="fontDown" class="round ghost" aria-label="Smaller">A−</button>
+      <span id="fontVal">20</span>
+      <button id="fontUp" class="round ghost" aria-label="Bigger">A+</button>
+    </div>
+  </div>
+  <div class="setting">
+    <span>Theme</span>
+    <div class="swatches">
+      <button class="swatch paper" data-theme="paper" aria-label="Paper"></button>
+      <button class="swatch sepia" data-theme="sepia" aria-label="Sepia"></button>
+      <button class="swatch night" data-theme="night" aria-label="Night"></button>
+    </div>
+  </div>
+  <h2>Voice</h2>
+  <div class="setting">
+    <span>Speed</span>
+    <div class="stepper">
+      <button id="rateDown" class="round ghost" aria-label="Slower">−</button>
+      <span id="rateVal">1.0×</span>
+      <button id="rateUp" class="round ghost" aria-label="Faster">+</button>
+    </div>
+  </div>
+  <label class="setting toggle">
+    <span>Keep reading into the next chapter</span>
+    <input id="autoNext" type="checkbox" checked>
+  </label>
+  <div id="voiceList" class="voices"></div>
+  <button id="voiceSettings" class="pill wide">Open phone voice settings</button>
+  <h2>About</h2>
+  <p class="about">
+    <b>English</b> — King James Version (1769), public domain.<br>
+    <b>தமிழ்</b> — Indian Revised Version (IRV) Tamil, © 2017, 2019 Bridge Connectivity Solutions, CC BY-SA 4.0.<br>
+    <b>ଓଡ଼ିଆ</b> — Indian Revised Version (IRV) Odia, © 2017, 2019, 2021 Bridge Connectivity Solutions, CC BY-SA 4.0.<br>
+    Text from eBible.org. Fonts: Crimson Pro, Noto Serif Tamil, Noto Serif Oriya (SIL Open Font License).
+  </p>
+</section>
+
+<section id="searchSheet" class="sheet tall" hidden>
+  <div class="grab"></div>
+  <form id="searchForm" class="searchrow">
+    <input id="searchInput" type="search" placeholder="Search the Bible" autocomplete="off">
+    <button class="pill primary" type="submit">Search</button>
+  </form>
+  <div id="searchStatus" class="searchstatus"></div>
+  <div id="searchResults" class="results"></div>
+</section>
+
+<script src="books.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
