@@ -50,14 +50,16 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
   display: flex; align-items: center; gap: 6px; padding: 6px 4px;
   font-family: var(--serif); font-size: 21px; font-weight: 600; min-width: 0;
 }
-.ref #refBook { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 48vw; }
+.ref #refBook { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.ref:lang(ta), .ref:lang(or) { font-size: 17px; }
+.bar { gap: 6px; padding-left: 12px; padding-right: 6px; }
 .ref .caret { width: 18px; height: 18px; color: var(--muted); flex: none; }
-.bar-actions { display: flex; align-items: center; gap: 2px; }
-.icon { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 50%; color: var(--ink); }
+.bar-actions { display: flex; align-items: center; gap: 0; flex: none; }
+.icon { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 50%; color: var(--ink); }
 .icon:active { background: var(--line); }
 .icon.small { width: 34px; height: 34px; }
 .lang-pill {
-  height: 32px; padding: 0 12px; border-radius: 16px; margin: 0 4px;
+  height: 32px; padding: 0 10px; border-radius: 16px; margin: 0 2px;
   border: 1.5px solid var(--accent); color: var(--accent); font-weight: 600; font-size: 14px;
 }
 
@@ -227,3 +229,72 @@ body[data-theme="night"] .voice-row .ok { color: #7BC48A; }
 .result .rr { font-size: 12.5px; font-weight: 700; color: var(--gold); margin-bottom: 3px; }
 .result .rt { font-family: var(--serif); font-size: 17px; line-height: 1.5; }
 .result mark { background: var(--sel); color: inherit; border-radius: 3px; padding: 0 1px; }
+
+/* ---------- highlights & notes ---------- */
+body { --hl-y: #FBEA9C; --hl-g: #CDEBC0; --hl-b: #C9DFF5; --hl-p: #F6CFDC; }
+body[data-theme="sepia"] { --hl-y: #F3DC86; --hl-g: #CFE0AE; --hl-b: #C6D8E4; --hl-p: #EDC4C8; }
+body[data-theme="night"] { --hl-y: #5A4C14; --hl-g: #26452A; --hl-b: #1F3651; --hl-p: #53263A; }
+.verse.hl-y { background: var(--hl-y); } .verse.hl-g { background: var(--hl-g); }
+.verse.hl-b { background: var(--hl-b); } .verse.hl-p { background: var(--hl-p); }
+.verse.sel { box-shadow: inset 0 0 0 2px var(--accent); }
+.note-ic {
+  display: inline-grid; place-items: center; width: 26px; height: 26px; margin-left: 4px;
+  vertical-align: -4px; border-radius: 50%; background: var(--accent); color: var(--accent-ink);
+}
+.note-ic svg { width: 14px; height: 14px; }
+
+.selbar { flex-direction: column; align-items: stretch; gap: 8px; padding: 10px 12px; }
+.selrow { display: flex; align-items: center; gap: 8px; }
+.selrow.actions { overflow-x: auto; scrollbar-width: none; }
+.selrow.actions::-webkit-scrollbar { display: none; }
+.colors { display: flex; gap: 8px; margin-left: auto; }
+.dot { width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--line); display: grid; place-items: center; }
+.dot.y { background: #F7D84A; } .dot.g { background: #8FCB7B; } .dot.b { background: #7FB2E6; } .dot.p { background: #EE93B2; }
+.dot.none { background: var(--bg); color: var(--muted); }
+.dot.none svg { width: 16px; height: 16px; }
+.pill.small { height: 32px; padding: 0 12px; font-size: 13px; }
+
+/* ---------- verse of the day ---------- */
+.votd {
+  margin: 14px 0 4px; padding: 14px 16px 12px; border-radius: 18px;
+  background: linear-gradient(135deg, #7E2330, #4A1119); color: #FBF3E2; box-shadow: var(--shadow);
+}
+body[data-theme="night"] .votd { background: linear-gradient(135deg, #3A2A12, #1D160B); }
+.votd-top { display: flex; align-items: center; justify-content: space-between; }
+.votd-label { font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: #E2B769; }
+.votd .icon { color: #FBF3E2; }
+.votd-text { font-family: var(--serif); font-size: calc(var(--fs) * .95); line-height: 1.55; margin: 4px 0 10px; }
+.votd:lang(ta) .votd-text { font-family: "Noto Serif Tamil", serif; }
+.votd:lang(or) .votd-text { font-family: "Noto Serif Oriya", serif; }
+.votd-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.votd-ref { font-weight: 700; font-size: 14px; color: #E2B769; }
+.votd-actions { display: flex; gap: 6px; }
+.votd .pill { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.25); color: #FBF3E2; }
+.votd .pill.primary { background: #E2B769; border-color: #E2B769; color: #3E0D15; }
+
+/* ---------- library ---------- */
+.filter { margin: 2px 0 8px; }
+.result.hist { display: flex; justify-content: space-between; align-items: baseline; }
+.result .when { font-size: 12.5px; color: var(--muted); }
+.result .rnote { font-size: 14px; color: var(--ink); margin-top: 6px; padding: 8px 10px; background: var(--bg); border-radius: 10px; font-family: var(--sans); }
+.result.today { background: var(--bg); border-radius: 14px; padding: 12px; margin: 4px 0 8px; border: 1px solid var(--line); }
+.mdot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: 0; }
+.mdot.y { background: #F7D84A; } .mdot.g { background: #8FCB7B; } .mdot.b { background: #7FB2E6; } .mdot.p { background: #EE93B2; }
+
+/* ---------- note ---------- */
+.note-verse { font-family: var(--serif); font-size: 16px; line-height: 1.55; color: var(--muted); max-height: 7.5em; overflow-y: auto; margin: 0 0 10px; }
+.note-text {
+  width: 100%; border-radius: 12px; border: 1.5px solid var(--line); background: var(--bg); color: var(--ink);
+  font: inherit; font-size: 16px; padding: 12px; resize: vertical; outline: none;
+}
+.note-text:focus { border-color: var(--accent); }
+.note-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+
+/* ---------- image ---------- */
+.img-canvas { width: 100%; max-width: 420px; aspect-ratio: 1; display: block; margin: 0 auto; border-radius: 14px; box-shadow: var(--shadow); }
+.styles { margin-top: 12px; justify-content: center; }
+.stylechip { padding: 8px 14px; border-radius: 16px; font-size: 13px; font-weight: 700; border: 2px solid transparent; }
+.stylechip.on { border-color: var(--ink); }
+
+.timeinput { height: 38px; border-radius: 10px; border: 1.5px solid var(--line); background: var(--bg); color: var(--ink); font: inherit; padding: 0 10px; }
+.player .pill.rate svg { width: 16px; height: 16px; }

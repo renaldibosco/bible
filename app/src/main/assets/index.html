@@ -14,6 +14,9 @@
     <svg viewBox="0 0 24 24" class="caret"><path d="M7 10l5 5 5-5"/></svg>
   </button>
   <div class="bar-actions">
+    <button id="libBtn" class="icon" aria-label="My verses and history">
+      <svg viewBox="0 0 24 24"><path d="M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1z"/></svg>
+    </button>
     <button id="searchBtn" class="icon" aria-label="Search">
       <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>
     </button>
@@ -25,6 +28,17 @@
 </header>
 
 <main id="reader" class="reader" tabindex="-1">
+  <div id="votd" class="votd" hidden>
+    <div class="votd-top"><span class="votd-label">Verse of the day</span>
+      <button id="votdClose" class="icon small" aria-label="Hide"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <div id="votdText" class="votd-text"></div>
+    <div class="votd-foot"><span id="votdRef" class="votd-ref"></span>
+      <span class="votd-actions">
+        <button id="votdListen" class="pill small">Listen</button>
+        <button id="votdImage" class="pill small">Image</button>
+        <button id="votdOpen" class="pill small primary">Open</button>
+      </span></div>
+  </div>
   <div id="chapter" class="chapter"></div>
   <nav class="chapnav">
     <button id="prevBtn" class="navbtn">‹ <span>Previous</span></button>
@@ -34,15 +48,28 @@
 
 <!-- appears when verses are tapped -->
 <div id="selBar" class="selbar" hidden>
-  <span id="selCount" class="selcount">1 verse</span>
-  <button id="selListen" class="pill primary">
-    <svg viewBox="0 0 24 24"><path d="M5 9v6h4l5 4V5L9 9H5z"/><path d="M17 8.5a5 5 0 0 1 0 7"/></svg> Listen
-  </button>
-  <button id="selCopy" class="pill">Copy</button>
-  <button id="selShare" class="pill">Share</button>
-  <button id="selClear" class="icon small" aria-label="Clear selection">
-    <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
-  </button>
+  <div class="selrow">
+    <span id="selCount" class="selcount">1 verse</span>
+    <span class="colors">
+      <button class="dot y" data-color="y" aria-label="Yellow highlight"></button>
+      <button class="dot g" data-color="g" aria-label="Green highlight"></button>
+      <button class="dot b" data-color="b" aria-label="Blue highlight"></button>
+      <button class="dot p" data-color="p" aria-label="Pink highlight"></button>
+      <button class="dot none" data-color="" aria-label="Remove highlight"><svg viewBox="0 0 24 24"><path d="M6 6l12 12"/></svg></button>
+    </span>
+    <button id="selClear" class="icon small" aria-label="Clear selection">
+      <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+  </div>
+  <div class="selrow actions">
+    <button id="selListen" class="pill primary">
+      <svg viewBox="0 0 24 24"><path d="M5 9v6h4l5 4V5L9 9H5z"/><path d="M17 8.5a5 5 0 0 1 0 7"/></svg> Listen
+    </button>
+    <button id="selNote" class="pill">Note</button>
+    <button id="selImage" class="pill">Image</button>
+    <button id="selCopy" class="pill">Copy</button>
+    <button id="selShare" class="pill">Share</button>
+  </div>
 </div>
 
 <!-- appears when text is highlighted with a long-press -->
@@ -56,6 +83,9 @@
     <div id="playerTitle" class="player-title">Reading</div>
     <div id="playerSub" class="player-sub"></div>
   </div>
+  <button id="sleepBtn" class="pill rate" aria-label="Sleep timer">
+    <svg viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg><span id="sleepLabel"></span>
+  </button>
   <button id="rateBtn" class="pill rate">1.0×</button>
   <button id="pauseBtn" class="round" aria-label="Pause">
     <svg id="pauseIcon" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></svg>
@@ -131,6 +161,19 @@
   </label>
   <div id="voiceList" class="voices"></div>
   <button id="voiceSettings" class="pill wide">Open phone voice settings</button>
+  <h2>Verse of the day</h2>
+  <label class="setting toggle">
+    <span>Show it when I open the app</span>
+    <input id="votdShow" type="checkbox" checked>
+  </label>
+  <label class="setting toggle">
+    <span>Morning notification</span>
+    <input id="votdNotify" type="checkbox">
+  </label>
+  <div class="setting" id="votdTimeRow">
+    <span>Time</span>
+    <input id="votdTime" type="time" value="07:00" class="timeinput">
+  </div>
   <h2>About</h2>
   <p class="about">
     <b>English</b> — King James Version (1769), public domain.<br>
@@ -138,6 +181,49 @@
     <b>ଓଡ଼ିଆ</b> — Indian Revised Version (IRV) Odia, © 2017, 2019, 2021 Bridge Connectivity Solutions, CC BY-SA 4.0.<br>
     Text from eBible.org. Fonts: Crimson Pro, Noto Serif Tamil, Noto Serif Oriya (SIL Open Font License).
   </p>
+</section>
+
+<section id="libSheet" class="sheet tall" hidden>
+  <div class="grab"></div>
+  <div class="tabs">
+    <button class="tab on" data-lib="marks">My verses</button>
+    <button class="tab" data-lib="history">History</button>
+  </div>
+  <div id="markFilter" class="choices row filter">
+    <button class="chip on" data-f="all">All</button>
+    <button class="chip" data-f="hl">Highlights</button>
+    <button class="chip" data-f="note">Notes</button>
+  </div>
+  <div id="libList" class="results"></div>
+</section>
+
+<section id="noteSheet" class="sheet" hidden>
+  <div class="grab"></div>
+  <h2 id="noteRef">Note</h2>
+  <p id="noteVerse" class="note-verse"></p>
+  <textarea id="noteText" class="note-text" rows="5" placeholder="Write your thoughts, a prayer, or what this verse means to you…"></textarea>
+  <div class="note-actions">
+    <button id="noteDelete" class="pill">Delete</button>
+    <button id="noteSave" class="pill primary">Save note</button>
+  </div>
+</section>
+
+<section id="imageSheet" class="sheet" hidden>
+  <div class="grab"></div>
+  <h2>Share as image</h2>
+  <canvas id="imgCanvas" class="img-canvas" width="1080" height="1080"></canvas>
+  <div id="imgStyles" class="choices row styles"></div>
+  <div class="note-actions">
+    <button id="imgSave" class="pill">Save to gallery</button>
+    <button id="imgShare" class="pill primary">Share</button>
+  </div>
+</section>
+
+<section id="sleepSheet" class="sheet" hidden>
+  <div class="grab"></div>
+  <h2>Sleep timer</h2>
+  <p class="about">Stop reading aloud after:</p>
+  <div id="sleepList" class="choices row"></div>
 </section>
 
 <section id="searchSheet" class="sheet tall" hidden>

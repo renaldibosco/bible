@@ -9,6 +9,13 @@ import android.content.Intent
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.content.ContentValues
+import android.content.pm.PackageManager
+import android.provider.MediaStore
+import android.util.Base64
+import java.io.File
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.view.ActionMode
@@ -32,6 +39,13 @@ class MainActivity : Activity() {
     private var tts: TextToSpeech? = null
     private var ttsReady = false
     private var ttsFailed = false
+    private var pageReady = false
+    private var pendingRef: IntArray? = null
+    private val handler = Handler(Looper.getMainLooper())
+    private val sleepRunnable = Runnable {
+        try { tts?.stop() } catch (_: Exception) {}
+        js("window.sleepFired && window.sleepFired()")
+    }
     private val books = object : LinkedHashMap<String, String>(16, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>?) = size > 12
     }
@@ -53,13 +67,80 @@ class MainActivity : Activity() {
                     try { startActivity(Intent(Intent.ACTION_VIEW, req.url)) } catch (_: Exception) {}
                     return true
                 }
+                override fun onPageFinished(view: WebView?, url: String?) {
+                    pageReady = true
+                    deliverPendingRef()
+                }
             }
             addJavascriptInterface(Bridge(), "Bible")
             onReadSelection = { readSelectionFromMenu() }
         }
         setContentView(web)
+        takeRef(intent)
         web.loadUrl("file:///android_asset/index.html")
         startTts()
+        DailyVerse.reschedule(this)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        takeRef(intent)
+        deliverPendingRef()
+    }
+
+    // a tap on the daily-verse notification opens that verse
+    private fun takeRef(i: Intent?) {
+        val ref = i?.getIntArrayExtra(DailyVerse.EXTRA_REF) ?: return
+        pendingRef = ref
+        i.removeExtra(DailyVerse.EXTRA_REF)
+    }
+
+    private fun deliverPendingRef() {
+        val r = pendingRef ?: return
+        if (!pageReady) return
+        pendingRef = null
+        handler.postDelayed({ js("window.openRef && window.openRef(${r[0]}, ${r[1]}, ${r[2]})") }, 400)
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQ_NOTIFY) {
+            val ok = grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED
+            js("window.notifyPermission && window.notifyPermission($ok)")
+        }
+    }
+
+    private fun shareOrSaveImage(b64: String, name: String, save: Boolean) {
+        val bytes = try { Base64.decode(b64, Base64.DEFAULT) } catch (_: Exception) { return }
+        val safe = name.replace(Regex("[^A-Za-z0-9._-]"), "_").ifBlank { "verse.png" }
+        if (save) {
+            val ok = try {
+                if (Build.VERSION.SDK_INT >= 29) {
+                    val values = ContentValues().apply {
+                        put(MediaStore.Images.Media.DISPLAY_NAME, safe)
+                        put(MediaStore.Images.Media.MIME_TYPE, "image/png")
+                        put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Holy Bible")
+                    }
+                    val uri = contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+                    uri != null && contentResolver.openOutputStream(uri)?.use { it.write(bytes); true } == true
+                } else {
+                    val dir = File(getExternalFilesDir(android.os.Environment.DIRECTORY_PICTURES), "Holy Bible").apply { mkdirs() }
+                    File(dir, safe).writeBytes(bytes); true
+                }
+            } catch (_: Exception) { false }
+            js("window.imageSaved && window.imageSaved($ok)")
+            return
+        }
+        val dir = File(cacheDir, "shared").apply { mkdirs() }
+        dir.listFiles()?.forEach { it.delete() }
+        File(dir, safe).writeBytes(bytes)
+        val uri = ShareProvider.uriFor(this, safe)
+        val send = Intent(Intent.ACTION_SEND).apply {
+            type = "image/png"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        startActivity(Intent.createChooser(send, "Share verse"))
     }
 
     // ---------------------------------------------------------------- speech
@@ -146,6 +227,31 @@ class MainActivity : Activity() {
         }
 
         @JavascriptInterface
+        fun loadText(name: String): String =
+            if (name.contains("..")) "" else try { assets.open(name).bufferedReader(Charsets.UTF_8).use { it.readText() } } catch (_: Exception) { "" }
+
+        @JavascriptInterface
+        fun shareImage(b64: String, name: String, save: Boolean) = runOnUiThread { shareOrSaveImage(b64, name, save) }
+
+        @JavascriptInterface
+        fun sleepTimer(ms: Long) = runOnUiThread {
+            handler.removeCallbacks(sleepRunnable)
+            if (ms > 0) handler.postDelayed(sleepRunnable, ms)
+        }
+
+        @JavascriptInterface
+        fun setDailyVerse(on: Boolean, hour: Int, minute: Int, lang: String, names: String) =
+            DailyVerse.save(this@MainActivity, on, hour, minute, lang, names)
+
+        @JavascriptInterface
+        fun askNotifications() = runOnUiThread {
+            if (Build.VERSION.SDK_INT >= 33 &&
+                checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), REQ_NOTIFY)
+            }
+        }
+
+        @JavascriptInterface
         fun speakQueue(json: String, rate: Float) = runOnUiThread { doSpeakQueue(json, rate) }
 
         @JavascriptInterface
@@ -213,6 +319,7 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
+        handler.removeCallbacks(sleepRunnable)
         try { tts?.stop(); tts?.shutdown() } catch (_: Exception) {}
         web.destroy()
         super.onDestroy()
@@ -224,6 +331,8 @@ class MainActivity : Activity() {
     }
 
     private fun q(s: String?): String = if (s == null) "null" else JSONObject.quote(s)
+
+    companion object { private const val REQ_NOTIFY = 41 }
 }
 
 /** WebView that adds "Read aloud" to the long-press text selection menu. */

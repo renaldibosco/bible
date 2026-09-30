@@ -25,6 +25,9 @@
     verses: [],        // current chapter [[label, text], ...]
     player: null
   };
+  let marks = store.get("marks", {});          // "b:c:label" -> {color, note, t}
+  const mkey = (b, c, label) => `${b}:${c}:${label}`;
+  const saveMarks = () => store.set("marks", marks);
   if (!LANGS[state.lang]) state.lang = "en";
   if (state.par && (!LANGS[state.par] || state.par === state.lang)) state.par = "";
 
@@ -74,7 +77,10 @@
         const bits = [...new Set(expand(label).map((n) => parMap.get(n)).filter(Boolean))];
         if (bits.length) par = `<span class="par" lang="${state.par}">${esc(bits.join(" "))}</span>`;
       }
-      html += `<span class="verse" data-i="${i}" id="v${i}"><span class="n">${esc(label)}</span>${esc(text)}${par}</span>`;
+      const m = marks[mkey(state.book, state.chap, label)];
+      const cls = m && m.color ? ` hl-${m.color}` : "";
+      const note = m && m.note ? `<button class="note-ic" data-i="${i}" aria-label="Open note"><svg viewBox="0 0 24 24"><path d="M5 19h4L19 9l-4-4L5 15v4z"/></svg></button>` : "";
+      html += `<span class="verse${cls}" data-i="${i}" id="v${i}"><span class="n">${esc(label)}</span>${esc(text)}${note}${par}</span>`;
     });
     const el = $("chapter");
     el.dataset.lang = state.lang;
@@ -87,6 +93,7 @@
     $("prevBtn").disabled = state.book === 0 && state.chap === 1;
     $("nextBtn").disabled = state.book === 65 && state.chap === count;
     store.set("book", state.book); store.set("chap", state.chap);
+    addHistory(state.book, state.chap);
     if (opts.scroll !== false) window.scrollTo(0, 0);
     if (state.player) markReading();
   }
@@ -119,6 +126,8 @@
 
   // ------------------------------------------------------------ verse selection
   $("chapter").addEventListener("click", (e) => {
+    const ni = e.target.closest(".note-ic");
+    if (ni) { e.stopPropagation(); openNote([+ni.dataset.i]); return; }
     const v = e.target.closest(".verse");
     if (!v) return;
     const s = window.getSelection();
@@ -299,6 +308,8 @@
   }
   function stopPlayer() {
     tts.stop();
+    setSleep(0);
+    state.sleepEOC = false;
     state.player = null;
     document.body.classList.remove("playing");
     $("player").hidden = true;
@@ -335,7 +346,8 @@
       markReading();
       if (p.meta.chapter) $("playerSub").textContent = `Verse ${p.items[k].label || k + 1} · ${LANGS[p.items[k].lang].name}`;
     } else if (type === "done" && k === p.items.length - 1 && !p.paused) {
-      if (p.meta.chapter && state.autoNext) {
+      if (state.sleepEOC) { state.sleepEOC = false; toast("Sleep timer: stopped at the end of the chapter"); stopPlayer(); }
+      else if (p.meta.chapter && state.autoNext) {
         step(1).then((moved) => (moved ? playChapter(0) : stopPlayer()));
       } else stopPlayer();
     } else if (type === "error") {
@@ -470,8 +482,9 @@
     if (state.par === state.lang) state.par = "";
     store.set("lang", state.lang); store.set("par", state.par);
     if (state.player) stopPlayer();
+    scheduleDaily();
     renderLangs();
-    render({ scroll: false });
+    render({ scroll: false }).then(showVotd);
     setTimeout(hideSheet, 180);
   };
   $("parList").onclick = (e) => {
@@ -490,6 +503,7 @@
     document.querySelectorAll(".swatch").forEach((s) => s.classList.toggle("on", s.dataset.theme === state.theme));
     $("rateVal").textContent = state.rate.toFixed(2).replace(/0$/, "") + "×";
     $("autoNext").checked = state.autoNext;
+    renderVotdSettings();
     let h = "";
     for (const L of Object.values(LANGS)) {
       const st = tts.status(L.tts);
@@ -571,6 +585,316 @@
     };
   };
 
+
+  // ------------------------------------------------------------ highlights & notes
+  document.querySelectorAll("#selBar .dot").forEach((d) => (d.onclick = () => {
+    const color = d.dataset.color;
+    for (const i of selectedIdx()) {
+      const k = mkey(state.book, state.chap, state.verses[i][0]);
+      const m = { ...(marks[k] || {}) };
+      if (color) { m.color = color; m.t = Date.now(); } else delete m.color;
+      if (!m.color && !m.note) delete marks[k]; else marks[k] = m;
+      const el = $("v" + i);
+      el.classList.remove("hl-y", "hl-g", "hl-b", "hl-p");
+      if (color) el.classList.add("hl-" + color);
+    }
+    saveMarks();
+    toast(color ? "Highlighted" : "Highlight removed");
+    clearSelection();
+  }));
+
+  let noteTarget = null;
+  function openNote(idx) {
+    const first = idx[0];
+    const k = mkey(state.book, state.chap, state.verses[first][0]);
+    noteTarget = { key: k, ref: refText(idx) };
+    $("noteRef").textContent = refText(idx);
+    $("noteVerse").textContent = idx.map((i) => state.verses[i][1]).join(" ");
+    $("noteVerse").lang = state.lang;
+    $("noteText").value = (marks[k] && marks[k].note) || "";
+    $("noteDelete").hidden = !(marks[k] && marks[k].note);
+    show("noteSheet");
+    setTimeout(() => $("noteText").focus(), 250);
+  }
+  $("selNote").onclick = () => { const idx = selectedIdx(); clearSelection(); openNote(idx); };
+  $("noteSave").onclick = () => {
+    const t = $("noteText").value.trim();
+    const k = noteTarget.key;
+    const m = { ...(marks[k] || {}) };
+    if (t) { m.note = t; m.noteRef = noteTarget.ref; m.t = Date.now(); } else { delete m.note; delete m.noteRef; }
+    if (!m.color && !m.note) delete marks[k]; else marks[k] = m;
+    saveMarks();
+    hideSheet();
+    render({ scroll: false });
+    toast(t ? "Note saved" : "Note removed");
+  };
+  $("noteDelete").onclick = () => { $("noteText").value = ""; $("noteSave").click(); };
+
+  // ------------------------------------------------------------ history
+  function addHistory(b, c) {
+    let h = store.get("history", []).filter((x) => !(x.b === b && x.c === c));
+    h.unshift({ b, c, t: Date.now() });
+    store.set("history", h.slice(0, 20));
+  }
+  function ago(t) {
+    const m = Math.round((Date.now() - t) / 60000);
+    if (m < 1) return "just now";
+    if (m < 60) return `${m} min ago`;
+    const h = Math.round(m / 60);
+    if (h < 24) return `${h} hr ago`;
+    const d = Math.round(h / 24);
+    return d === 1 ? "yesterday" : `${d} days ago`;
+  }
+
+  // ------------------------------------------------------------ library (My verses + history)
+  let libTab = "marks", libFilter = "all";
+  $("libBtn").onclick = () => { show("libSheet"); renderLib(); };
+  document.querySelectorAll("[data-lib]").forEach((t) => (t.onclick = () => { libTab = t.dataset.lib; renderLib(); }));
+  document.querySelectorAll("#markFilter .chip").forEach((c) => (c.onclick = () => { libFilter = c.dataset.f; renderLib(); }));
+  function parseKey(k) { const [b, c, ...l] = k.split(":"); return { b: +b, c: +c, label: l.join(":") }; }
+  async function renderLib() {
+    document.querySelectorAll("[data-lib]").forEach((t) => t.classList.toggle("on", t.dataset.lib === libTab));
+    document.querySelectorAll("#markFilter .chip").forEach((c) => c.classList.toggle("on", c.dataset.f === libFilter));
+    $("markFilter").hidden = libTab !== "marks";
+    const list = $("libList");
+    list.lang = state.lang;
+    if (libTab === "history") {
+      const h = store.get("history", []);
+      list.innerHTML = h.length ? h.map((x, k) =>
+        `<button class="result hist" data-k="${k}"><div class="rt">${esc(bookName(x.b))} ${x.c}</div><div class="when">${ago(x.t)}</div></button>`).join("")
+        : `<div class="empty-note">Chapters you read will appear here.</div>`;
+      list.onclick = (e) => {
+        const btn = e.target.closest(".result"); if (!btn) return;
+        const x = h[+btn.dataset.k]; hideSheet(); go(x.b, x.c);
+      };
+      return;
+    }
+    let items = Object.entries(marks).map(([k, m]) => ({ ...parseKey(k), ...m }))
+      .filter((m) => libFilter === "all" || (libFilter === "hl" ? m.color : m.note))
+      .sort((a, b) => (b.t || 0) - (a.t || 0));
+    let html = "";
+    const v = await todayVerse();
+    if (v && libFilter === "all") {
+      html += `<button class="result today" data-today="1"><div class="rr">Verse of the day · ${esc(v.ref)}</div><div class="rt">${esc(v.text)}</div></button>`;
+    }
+    if (!items.length) {
+      html += `<div class="empty-note">${libFilter === "note" ? "No notes yet. Tap a verse, then “Note”." : "Tap any verse and pick a colour to highlight it. Your highlights and notes appear here."}</div>`;
+    }
+    for (const [k, m] of items.entries()) {
+      const book = await getBook(state.lang, m.b);
+      const verse = (book[m.c - 1] || []).find((x) => x[0] === m.label);
+      html += `<button class="result mark" data-k="${k}"><div class="rr">${m.color ? `<span class="mdot ${m.color}"></span>` : ""}${esc(bookName(m.b))} ${m.c}:${esc(m.label)}</div>` +
+        `<div class="rt">${esc(verse ? verse[1] : "")}</div>` + (m.note ? `<div class="rnote">✎ ${esc(m.note)}</div>` : "") + `</button>`;
+    }
+    list.innerHTML = html;
+    list.onclick = async (e) => {
+      const btn = e.target.closest(".result"); if (!btn) return;
+      hideSheet();
+      if (btn.dataset.today) { openVerse(v.b, v.c, v.v); return; }
+      const m = items[+btn.dataset.k];
+      await go(m.b, m.c);
+      const i = state.verses.findIndex((x) => x[0] === m.label);
+      flashVerse(i);
+    };
+  }
+  function flashVerse(i) {
+    const el = $("v" + i);
+    if (!el) return;
+    el.scrollIntoView({ block: "center" });
+    el.classList.add("flash");
+    setTimeout(() => el.classList.remove("flash"), 1700);
+  }
+  async function openVerse(b, c, vnum) {
+    await go(b, c);
+    flashVerse(state.verses.findIndex((x) => expand(x[0]).includes(String(vnum))));
+  }
+  window.openRef = (b, c, v) => { hideSheet(); openVerse(b - 1, c, v); };
+
+  // ------------------------------------------------------------ verse of the day
+  let VOTD = null;
+  async function votdList() {
+    if (VOTD) return VOTD;
+    try {
+      VOTD = native ? JSON.parse(window.Bible.loadText("votd.json")) : await (await fetch("votd.json")).json();
+    } catch (_) { VOTD = []; }
+    return VOTD;
+  }
+  const dayIndex = () => Math.floor((Date.now() - new Date().getTimezoneOffset() * 60000) / 86400000);
+  async function todayVerse(lang = state.lang) {
+    const list = await votdList();
+    if (!list.length) return null;
+    const [b1, c, v] = list[dayIndex() % list.length];
+    const b = b1 - 1;
+    const verse = ((await getBook(lang, b))[c - 1] || []).find((x) => expand(x[0]).includes(String(v)));
+    if (!verse) return null;
+    return { b, c, v, lang, text: verse[1], ref: `${bookName(b, lang)} ${c}:${verse[0]}` };
+  }
+  async function showVotd() {
+    const v = await todayVerse();
+    if (!v || !store.get("votdShow", true) || store.get("votdSeen", -1) === dayIndex()) { $("votd").hidden = true; return; }
+    $("votdText").textContent = v.text;
+    $("votd").lang = state.lang;
+    $("votdRef").textContent = v.ref;
+    $("votd").hidden = false;
+    $("votdClose").onclick = () => { store.set("votdSeen", dayIndex()); $("votd").hidden = true; };
+    $("votdOpen").onclick = () => { store.set("votdSeen", dayIndex()); $("votd").hidden = true; openVerse(v.b, v.c, v.v); };
+    $("votdListen").onclick = () => play([{ text: v.text, lang: v.lang }], { title: v.ref, chapter: false });
+    $("votdImage").onclick = () => openImage(v.text, v.ref, v.lang);
+  }
+
+  // settings: daily notification
+  function renderVotdSettings() {
+    $("votdShow").checked = store.get("votdShow", true);
+    $("votdNotify").checked = store.get("votdNotify", false);
+    $("votdTime").value = store.get("votdTime", "07:00");
+    $("votdTimeRow").hidden = !$("votdNotify").checked;
+  }
+  $("votdShow").onchange = (e) => { store.set("votdShow", e.target.checked); store.set("votdSeen", -1); showVotd(); };
+  function scheduleDaily() {
+    const on = store.get("votdNotify", false);
+    const [h, m] = store.get("votdTime", "07:00").split(":").map(Number);
+    if (native && window.Bible.setDailyVerse) window.Bible.setDailyVerse(on, h, m, state.lang, JSON.stringify(BOOKS[state.lang]));
+  }
+  $("votdNotify").onchange = (e) => {
+    store.set("votdNotify", e.target.checked);
+    $("votdTimeRow").hidden = !e.target.checked;
+    if (e.target.checked && native && window.Bible.askNotifications) window.Bible.askNotifications();
+    if (!native && e.target.checked) toast("Notifications work in the phone app");
+    scheduleDaily();
+    if (e.target.checked) toast(`You'll get a verse every morning at ${store.get("votdTime", "07:00")}`);
+  };
+  $("votdTime").onchange = (e) => { store.set("votdTime", e.target.value || "07:00"); scheduleDaily(); };
+  window.notifyPermission = (granted) => {
+    if (!granted) {
+      store.set("votdNotify", false); $("votdNotify").checked = false; $("votdTimeRow").hidden = true;
+      toast("Notifications are blocked for this app. Allow them in phone Settings to get the daily verse.", 4500);
+      scheduleDaily();
+    }
+  };
+
+  // ------------------------------------------------------------ share as image
+  const IMG_STYLES = [
+    { id: "wine", name: "Wine", bg: ["#7E2330", "#3E0D15"], ink: "#FBF3E2", accent: "#E2B769" },
+    { id: "dawn", name: "Dawn", bg: ["#F9D776", "#F39A6E"], ink: "#3B1F14", accent: "#7A1F2B" },
+    { id: "night", name: "Night", bg: ["#1B2440", "#0B0F1E"], ink: "#EEF1FA", accent: "#E2B769" },
+    { id: "paper", name: "Paper", bg: ["#FBF8F2", "#EFE6D6"], ink: "#221C17", accent: "#7A1F2B" },
+    { id: "olive", name: "Olive", bg: ["#4A5836", "#1F2718"], ink: "#F4F0E0", accent: "#D9C27A" }
+  ];
+  const FAMILY = { en: "Crimson Pro", ta: "Noto Serif Tamil", or: "Noto Serif Oriya" };
+  let imgData = null;
+  function openImage(text, ref, lang) {
+    imgData = { text, ref, lang, style: store.get("imgStyle", "wine") };
+    $("imgStyles").innerHTML = IMG_STYLES.map((st) =>
+      `<button class="stylechip${st.id === imgData.style ? " on" : ""}" data-s="${st.id}" style="background:linear-gradient(135deg,${st.bg[0]},${st.bg[1]});color:${st.ink}">${st.name}</button>`).join("");
+    show("imageSheet");
+    drawImage();
+  }
+  $("imgStyles").onclick = (e) => {
+    const b = e.target.closest(".stylechip"); if (!b) return;
+    imgData.style = b.dataset.s; store.set("imgStyle", imgData.style);
+    document.querySelectorAll(".stylechip").forEach((x) => x.classList.toggle("on", x === b));
+    drawImage();
+  };
+  function wrapLines(ctx, text, maxW) {
+    const words = text.split(/\s+/);
+    const lines = [];
+    let line = "";
+    for (const w of words) {
+      const test = line ? line + " " + w : w;
+      if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; } else line = test;
+    }
+    if (line) lines.push(line);
+    return lines;
+  }
+  async function drawImage() {
+    const st = IMG_STYLES.find((x) => x.id === imgData.style) || IMG_STYLES[0];
+    const cv = $("imgCanvas"), ctx = cv.getContext("2d");
+    const W = cv.width, H = cv.height, pad = 110;
+    const fam = FAMILY[imgData.lang] || FAMILY.en;
+    try { await document.fonts.load(`400 60px "${fam}"`, imgData.text); await document.fonts.load(`600 40px "Crimson Pro"`); } catch (_) {}
+    const g = ctx.createLinearGradient(0, 0, W, H);
+    g.addColorStop(0, st.bg[0]); g.addColorStop(1, st.bg[1]);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    // soft frame
+    ctx.strokeStyle = st.accent; ctx.globalAlpha = 0.35; ctx.lineWidth = 3;
+    ctx.strokeRect(46, 46, W - 92, H - 92); ctx.globalAlpha = 1;
+    // quote mark
+    ctx.fillStyle = st.accent; ctx.font = `600 170px "Crimson Pro", serif`; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+    ctx.fillText("“", W / 2, 250);
+    // verse text, shrink until text + reference fit between the quote mark and the footer
+    const areaTop = 290, areaBottom = H - 150, refBlock = 110;
+    let size = imgData.lang === "en" ? 66 : 54, lines, lh;
+    for (; size >= 24; size -= 2) {
+      ctx.font = `400 ${size}px "${fam}", serif`;
+      lines = wrapLines(ctx, imgData.text, W - pad * 2);
+      lh = size * (imgData.lang === "en" ? 1.34 : 1.55);
+      if (lines.length * lh + refBlock <= areaBottom - areaTop) break;
+    }
+    const blockH = lines.length * lh + refBlock;
+    const top = areaTop + (areaBottom - areaTop - blockH) / 2 + lh / 2;
+    ctx.fillStyle = st.ink; ctx.textBaseline = "middle";
+    lines.forEach((l, k) => ctx.fillText(l, W / 2, top + k * lh));
+    // reference
+    const refY = top + (lines.length - 0.5) * lh + 36;
+    ctx.fillStyle = st.accent; ctx.fillRect(W / 2 - 40, refY, 80, 3);
+    ctx.font = `600 40px "${imgData.lang === "en" ? "Crimson Pro" : fam}", serif`;
+    ctx.fillText(imgData.ref, W / 2, refY + 50);
+    ctx.globalAlpha = 0.6; ctx.fillStyle = st.ink;
+    ctx.font = `500 26px system-ui, sans-serif`;
+    ctx.fillText(`Holy Bible · ${LANGS[imgData.lang].short}`, W / 2, H - 92);
+    ctx.globalAlpha = 1;
+  }
+  function imageOut(save) {
+    const url = $("imgCanvas").toDataURL("image/png");
+    const name = "verse-" + imgData.ref.replace(/[^\w]+/g, "-").replace(/^-|-$/g, "").toLowerCase().slice(0, 40) + ".png";
+    if (native && window.Bible.shareImage) {
+      window.Bible.shareImage(url.split(",")[1], name || "verse.png", !!save);
+    } else {
+      const a = document.createElement("a"); a.href = url; a.download = name || "verse.png"; a.click();
+    }
+  }
+  $("imgShare").onclick = () => imageOut(false);
+  $("imgSave").onclick = () => imageOut(true);
+  $("selImage").onclick = () => {
+    const idx = selectedIdx();
+    const text = idx.map((i) => state.verses[i][1]).join(" ");
+    const ref = refText(idx);
+    clearSelection();
+    openImage(text, ref, state.lang);
+  };
+  window.imageSaved = (ok) => toast(ok ? "Saved to your gallery (Pictures/Holy Bible)" : "Couldn't save the image");
+
+  // ------------------------------------------------------------ sleep timer
+  let sleepEnd = 0, sleepTick = 0, sleepTimerJs = 0;
+  const SLEEP = [[0, "Off"], [10, "10 min"], [15, "15 min"], [30, "30 min"], [45, "45 min"], [60, "1 hour"], [-1, "End of chapter"]];
+  $("sleepBtn").onclick = () => {
+    const cur = state.sleepEOC ? -1 : sleepEnd ? "on" : 0;
+    $("sleepList").innerHTML = SLEEP.map(([m, l]) => `<button class="chip${m === cur ? " on" : ""}" data-m="${m}">${l}</button>`).join("");
+    show("sleepSheet");
+  };
+  $("sleepList").onclick = (e) => {
+    const b = e.target.closest(".chip"); if (!b) return;
+    const m = +b.dataset.m;
+    hideSheet();
+    if (m === -1) { setSleep(0); state.sleepEOC = true; $("sleepLabel").textContent = " end"; toast("Will stop at the end of this chapter"); }
+    else { state.sleepEOC = false; setSleep(m); if (m) toast(`Reading will stop in ${m} minutes`); }
+  };
+  function setSleep(min) {
+    clearInterval(sleepTick); clearTimeout(sleepTimerJs);
+    sleepEnd = 0;
+    if (native && window.Bible.sleepTimer) window.Bible.sleepTimer(min * 60000);
+    $("sleepLabel").textContent = "";
+    if (!min) return;
+    sleepEnd = Date.now() + min * 60000;
+    if (!native) sleepTimerJs = setTimeout(() => window.sleepFired(), min * 60000);
+    const upd = () => { $("sleepLabel").textContent = " " + Math.max(1, Math.ceil((sleepEnd - Date.now()) / 60000)) + "m"; };
+    upd(); sleepTick = setInterval(upd, 20000);
+  }
+  window.sleepFired = () => {
+    sleepEnd = 0;
+    if (state.player) { stopPlayer(); toast("Sleep timer: reading stopped. Good night 🌙", 3500); }
+  };
+
   // ------------------------------------------------------------ navigation
   $("prevBtn").onclick = () => step(-1);
   $("nextBtn").onclick = () => step(1);
@@ -619,5 +943,6 @@
 
   // ------------------------------------------------------------ start
   applyLook();
-  render({ scroll: false }).then(() => window.scrollTo(0, store.get("scroll", 0)));
+  render({ scroll: false }).then(() => { window.scrollTo(0, store.get("scroll", 0)); showVotd(); });
+  scheduleDaily();
 })();
